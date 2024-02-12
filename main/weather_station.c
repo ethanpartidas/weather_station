@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
-#include <sys/time.h>
 #include <string.h>
 
 #include "nvs_flash.h"
@@ -12,6 +11,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #define GATTS_TAG "GATTS_DEMO"
 #define DEVICE_NAME "Weather Station"
@@ -192,34 +192,32 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 }
 
 void pollDHT11(void* parameter) {
+	uint32_t data = 0;
+	int64_t time_us_start;
+	int64_t time_us_stop;
     while(1) {
         gpio_set_direction(DHT11_PIN, GPIO_MODE_OUTPUT);
         gpio_set_level(DHT11_PIN, 0);
-        vTaskDelay(20 / portTICK_PERIOD_MS);
-        gpio_set_level(DHT11_PIN, 1);
+    	time_us_start = esp_timer_get_time();
+		while (esp_timer_get_time() - time_us_start < 20000) {}
         gpio_set_direction(DHT11_PIN, GPIO_MODE_INPUT);
         while(gpio_get_level(DHT11_PIN) == 1){}
         while(gpio_get_level(DHT11_PIN) == 0){}
         while(gpio_get_level(DHT11_PIN) == 1){}
-        int data = 0;
         for (int i = 0; i < 32; i++) {
             while(gpio_get_level(DHT11_PIN) == 0){}
-            struct timeval tv_start;
-            gettimeofday(&tv_start, NULL);
-            int64_t time_us_start = (int64_t)tv_start.tv_sec * 1000000L + (int64_t)tv_start.tv_usec;
+            time_us_start = esp_timer_get_time();
             while(gpio_get_level(DHT11_PIN) == 1){}
-            struct timeval tv_stop;
-            gettimeofday(&tv_stop, NULL);
-            int64_t time_us_stop = (int64_t)tv_stop.tv_sec * 1000000L + (int64_t)tv_stop.tv_usec;
-            int bit = (time_us_stop - time_us_start > 50) ? 1 : 0;
+            time_us_stop = esp_timer_get_time();
+            uint8_t bit = (time_us_stop - time_us_start > 50) ? 1 : 0;
             data = (data << 1) | bit;
         }
-		
+
         float humidity = data >> 24;
         float celsius = ((data << 16) >> 24) + (float)((data << 24) >> 24) / 10;
-        float fahrenheit = celsius * 1.8 + 32;
+		float fahrenheit = celsius * 1.8 + 32;
 
-        printf("Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F\n", humidity, celsius, fahrenheit);
+		printf("Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F\n", humidity, celsius, fahrenheit);
         sprintf(buf, " Temp: %.2f F                           Humidity: %.0f%%", fahrenheit, humidity);
 		xSemaphoreGive(buf_update);
 		
@@ -228,7 +226,7 @@ void pollDHT11(void* parameter) {
 		char_value[2] = (data & 0xFF00) >> 8;
 		char_value[3] = data & 0xFF;
 
-		esp_ble_gatts_set_attr_value(handles[CHAR_IDX], 4, char_value);
+		esp_ble_gatts_set_attr_value(handles[VAL_IDX], 4, char_value);
 
 		if (profile.connected && char_ccc[0] == 0x01) {
 			esp_ble_gatts_send_indicate(
@@ -317,6 +315,7 @@ void app_main(void)
 
 	esp_ble_gatt_set_local_mtu(500);
 
+    gpio_set_direction(DHT11_PIN, GPIO_MODE_INPUT);
     gpio_set_direction(RS, GPIO_MODE_OUTPUT);
     gpio_set_direction(E, GPIO_MODE_OUTPUT);
     gpio_set_direction(D7, GPIO_MODE_OUTPUT);
