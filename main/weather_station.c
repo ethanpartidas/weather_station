@@ -28,8 +28,8 @@
 #define D1 27
 #define D0 32
 
-char buf[64] = {0}; 
-static SemaphoreHandle_t buf_update;
+char LCD_message_buffer[64] = {0}; 
+static SemaphoreHandle_t LCD_message_buffer_update;
 
 static uint8_t adv_service_uuid128[32] = {
 	0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xEE, 0x00, 0x00, 0x00,
@@ -70,29 +70,37 @@ struct gatts_profile {
 static struct gatts_profile profile = {};
 
 static const uint16_t gatts_service_uuid = 0x00FF;
-static const uint16_t gatts_char_uuid = 0xFF01;
+static const uint16_t gatts_th_uuid = 0xFF01;
+static const uint16_t gatts_ssid_uuid = 0xFF02;
+static const uint16_t gatts_password_uuid = 0xFF03;
 
 static const uint16_t primary_service_uuid              = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t characteristic_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t characteristic_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
 static const uint8_t char_prop_read_notify              = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static uint8_t char_ccc[2]      			   			= {0x00, 0x00};
-static uint8_t char_value[4]                 			= {0x00, 0x00, 0x00, 0x00};
+static const uint8_t char_prop_read_write             	= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
+static uint8_t th_ccc[2]      			   				= {0};
+static uint8_t th_value[4]                 				= {0};
+static uint8_t ssid_value[33]							= {0};
+static uint8_t password_value[64]						= {0};
 
 enum {
 	SERV_IDX,
-	CHAR_IDX,
-	VAL_IDX,
-	CCC_IDX,
+	TH_IDX,
+	TH_VAL_IDX,
+	TH_CCC_IDX,
+	SSID_IDX,
+	SSID_VAL_IDX,
+	PASS_IDX,
+	PASS_VAL_IDX,
 	NUM_HANDLES
 };
 
 uint16_t handles[NUM_HANDLES];
 
-#define GATTS_NUM_DEC 5
 static const esp_gatts_attr_db_t gatts_db[] = {
 	// Service Declaration
-	{
+	[SERV_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
@@ -103,8 +111,8 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			(uint8_t *)&gatts_service_uuid
 		}
 	},
-	// Characteristic Declaration
-	{
+	// TH Characteristic Declaration
+	[TH_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
@@ -115,28 +123,76 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			(uint8_t *)&char_prop_read_notify
 		}
 	},
-	// Characteristic Value
-	{
+	// TH Characteristic Value
+	[TH_VAL_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
-			(uint8_t *)&gatts_char_uuid,
+			(uint8_t *)&gatts_th_uuid,
 			ESP_GATT_PERM_READ,
-			sizeof(char_value),
-			sizeof(char_value),
-			(uint8_t *)&char_value
+			sizeof(th_value),
+			sizeof(th_value),
+			(uint8_t *)&th_value
 		}
 	},
-	// Characteristic CCC
-	{
+	// TH Characteristic CCC
+	[TH_CCC_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
 			(uint8_t *)&characteristic_client_config_uuid,
 			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
 			sizeof(uint16_t),
-			sizeof(char_ccc),
-			(uint8_t *)&char_ccc
+			sizeof(th_ccc),
+			(uint8_t *)&th_ccc
+		}
+	},
+	// SSID Characteristic Declaration
+	[SSID_IDX] = {
+		{ESP_GATT_AUTO_RSP},
+		{
+			ESP_UUID_LEN_16,
+			(uint8_t *)&characteristic_declaration_uuid,
+			ESP_GATT_PERM_READ,
+			sizeof(uint8_t),
+			sizeof(uint8_t),
+			(uint8_t *)&char_prop_read_write
+		}
+	},
+	// SSID Characteristic Value
+	[SSID_VAL_IDX] = {
+		{ESP_GATT_AUTO_RSP},
+		{
+			ESP_UUID_LEN_16,
+			(uint8_t *)&gatts_ssid_uuid,
+			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+			32,
+			0,
+			(uint8_t *)&ssid_value
+		}
+	},
+	// Password Characteristic Declaration
+	[PASS_IDX] = {
+		{ESP_GATT_AUTO_RSP},
+		{
+			ESP_UUID_LEN_16,
+			(uint8_t *)&characteristic_declaration_uuid,
+			ESP_GATT_PERM_READ,
+			sizeof(uint8_t),
+			sizeof(uint8_t),
+			(uint8_t *)&char_prop_read_write
+		}
+	},
+	// Password Characteristic Value
+	[PASS_VAL_IDX] = {
+		{ESP_GATT_AUTO_RSP},
+		{
+			ESP_UUID_LEN_16,
+			(uint8_t *)&gatts_password_uuid,
+			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+			63,
+			0,
+			(uint8_t *)&password_value
 		}
 	},
 };
@@ -159,7 +215,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 			esp_ble_gap_config_adv_data(&adv_data);
 
-			esp_ble_gatts_create_attr_tab(gatts_db, gatts_if, GATTS_NUM_DEC, 0);
+			esp_ble_gatts_create_attr_tab(gatts_db, gatts_if, NUM_HANDLES, 0);
 
 			printf("GATT Server Registered\n");
 			break;
@@ -169,11 +225,19 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 			printf("GATT Server Attribute Table Created\n");
 			break;
 		case ESP_GATTS_WRITE_EVT:
-			if (param->write.handle == handles[CCC_IDX]) {
-				esp_ble_gatts_set_attr_value(handles[CCC_IDX], 2, param->write.value);
-				char_ccc[0] = param->write.value[0];
-				char_ccc[1] = param->write.value[1];
-				printf("Client Wrote to Configuration\n");
+			if (param->write.handle == handles[TH_CCC_IDX]) {
+					esp_ble_gatts_set_attr_value(handles[TH_CCC_IDX], 2, param->write.value);
+					th_ccc[0] = param->write.value[0];
+					th_ccc[1] = param->write.value[1];
+					printf("Client Wrote to Configuration\n");
+			} else if (param->write.handle == handles[SSID_VAL_IDX]) {
+				memset(ssid_value, 0, 32);
+				memcpy(ssid_value, param->write.value, param->write.len);
+				printf("Client Set SSID: %s\n", ssid_value);
+			} else if (param->write.handle == handles[PASS_VAL_IDX]) {
+				memset(password_value, 0, 63);
+				memcpy(password_value, param->write.value, param->write.len);
+				printf("Client Set Password: %s\n", password_value);
 			}
 			break;
 		case ESP_GATTS_CONNECT_EVT:
@@ -218,23 +282,23 @@ void pollDHT11(void* parameter) {
 		float fahrenheit = celsius * 1.8 + 32;
 
 		printf("Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F\n", humidity, celsius, fahrenheit);
-        sprintf(buf, " Temp: %.2f F                           Humidity: %.0f%%", fahrenheit, humidity);
-		xSemaphoreGive(buf_update);
+        sprintf(LCD_message_buffer, " Temp: %.2f F                           Humidity: %.0f%%", fahrenheit, humidity);
+		xSemaphoreGive(LCD_message_buffer_update);
 		
-		char_value[0] = data >> 24;
-		char_value[1] = (data & 0xFF0000) >> 16;
-		char_value[2] = (data & 0xFF00) >> 8;
-		char_value[3] = data & 0xFF;
+		th_value[0] = data >> 24;
+		th_value[1] = (data & 0xFF0000) >> 16;
+		th_value[2] = (data & 0xFF00) >> 8;
+		th_value[3] = data & 0xFF;
 
-		esp_ble_gatts_set_attr_value(handles[VAL_IDX], 4, char_value);
+		esp_ble_gatts_set_attr_value(handles[TH_VAL_IDX], 4, th_value);
 
-		if (profile.connected && char_ccc[0] == 0x01) {
+		if (profile.connected && th_ccc[0] == 0x01) {
 			esp_ble_gatts_send_indicate(
 				profile.gatts_if,
 				profile.conn_id,
-				handles[VAL_IDX],
+				handles[TH_VAL_IDX],
 				4,
-				char_value,
+				th_value,
 				false
 			);
 			printf("Notifying Client of Update\n");
@@ -281,7 +345,7 @@ void outputLCD(void* parameter) {
     while(1) {
 		vTaskDelay(500 / portTICK_PERIOD_MS);
 
-		if (xSemaphoreTake(buf_update, 1) == pdFALSE) {
+		if (xSemaphoreTake(LCD_message_buffer_update, 1) == pdFALSE) {
 			continue;
 		}
 
@@ -292,7 +356,7 @@ void outputLCD(void* parameter) {
         send_command(0x002);
 
 		// write message
-        send_string(buf);
+        send_string(LCD_message_buffer);
     }
 }
 
@@ -327,7 +391,7 @@ void app_main(void)
     gpio_set_direction(D1, GPIO_MODE_OUTPUT);
     gpio_set_direction(D0, GPIO_MODE_OUTPUT);
 
-	buf_update = xSemaphoreCreateBinary();
+	LCD_message_buffer_update = xSemaphoreCreateBinary();
 
     xTaskCreate(
         pollDHT11,
