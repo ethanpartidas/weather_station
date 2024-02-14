@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "connect_wifi.h"
+
 #define TAG "BLE_GATT_SERVER"
 #define DEVICE_NAME "Weather Station"
 
@@ -218,6 +220,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 				memset(password_value, 0, 63);
 				memcpy(password_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set Password: %s", password_value);
+				connect_wifi(ssid_value, password_value);
 			}
 			break;
 		case ESP_GATTS_CONNECT_EVT:
@@ -250,9 +253,12 @@ void ble_gatt_server_init() {
 	esp_ble_gatts_app_register(0);
 
 	esp_ble_gatt_set_local_mtu(500);
+
+	connect_wifi_init();
 }
 
-void ble_gatt_server_set_th_value(uint8_t *th_value) {
+void ble_gatt_server_set_th_value(uint8_t *th_value_input) {
+	memcpy(th_value, th_value_input, 4);
 	esp_ble_gatts_set_attr_value(handles[TH_VAL_IDX], 4, th_value);
 }
 

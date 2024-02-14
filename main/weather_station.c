@@ -24,7 +24,7 @@ char LCD_message_buffer[64] = {0};
 static SemaphoreHandle_t LCD_message_buffer_update;
 
 void pollDHT11(void* parameter) {
-	uint32_t data;
+	uint32_t data = 0;
 	uint8_t th_value[4];
 	int64_t time_us_start;
 	int64_t time_us_stop;
@@ -139,21 +139,23 @@ void app_main(void)
 
 	ble_gatt_server_init();
 
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         pollDHT11,
         "Measure Temperature and Humidity",
         2048,
         NULL,
         2,
-        NULL
+        NULL,
+		1
     );
     
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         outputLCD,
         "Output Data to LCD",
         2048,
         NULL,
         1,
-        NULL
+        NULL,
+		1
     );
 }
