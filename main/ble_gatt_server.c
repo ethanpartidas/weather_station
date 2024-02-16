@@ -7,9 +7,12 @@
 #include "esp_log.h"
 
 #include <string.h>
+#include "ble_gatt_server.h"
 
 #define TAG "BLE_GATT_SERVER"
 #define DEVICE_NAME "Weather Station"
+
+static ble_gatt_server_callback_t callback = NULL;
 
 static uint8_t adv_service_uuid128[32] = {
 	0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0xEE, 0x00, 0x00, 0x00,
@@ -58,13 +61,12 @@ static const uint16_t primary_service_uuid              = ESP_GATT_UUID_PRI_SERV
 static const uint16_t characteristic_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
 static const uint16_t characteristic_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
 static const uint8_t char_prop_read_notify              = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static const uint8_t char_prop_read_write             	= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
+static const uint8_t char_prop_write             	= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
 static uint8_t th_ccc[2]      			   				= {0};
 static uint8_t th_value[4]                 				= {0};
 uint8_t ssid_value[33]									= {0};
 uint8_t password_value[64]								= {0};
 uint8_t ssid_set = 0;
-uint8_t password_set = 0;
 
 enum {
 	SERV_IDX,
@@ -138,7 +140,7 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			ESP_GATT_PERM_READ,
 			sizeof(uint8_t),
 			sizeof(uint8_t),
-			(uint8_t *)&char_prop_read_write
+			(uint8_t *)&char_prop_write
 		}
 	},
 	// SSID Characteristic Value
@@ -162,7 +164,7 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			ESP_GATT_PERM_READ,
 			sizeof(uint8_t),
 			sizeof(uint8_t),
-			(uint8_t *)&char_prop_read_write
+			(uint8_t *)&char_prop_write
 		}
 	},
 	// Password Characteristic Value
@@ -221,7 +223,9 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 				memset(password_value, 0, 63);
 				memcpy(password_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set Password: %s", password_value);
-				password_set = 1;
+				if (ssid_set) {
+					callback(BLE_GATT_SERVER_SSID_PASSWORD_SET_EVENT);
+				}
 			}
 			break;
 		case ESP_GATTS_CONNECT_EVT:
@@ -275,6 +279,6 @@ void ble_gatt_server_notify() {
 	}
 }
 
-uint8_t ble_gatt_server_ssid_password_set() {
-	return ssid_set && password_set;
+void ble_gatt_server_register_callback(ble_gatt_server_callback_t cb) {
+	callback = cb;
 }

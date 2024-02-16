@@ -124,6 +124,15 @@ static void outputLCD(void* parameter) {
     }
 }
 
+void ble_gatt_server_callback(ble_gatt_server_event_t event) {
+	switch (event) {
+		case BLE_GATT_SERVER_SSID_PASSWORD_SET_EVENT:
+			connect_wifi_config(ssid_value, password_value);
+			connect_wifi();
+		break;
+	}
+}
+
 void app_main(void)
 {
 	nvs_flash_init();
@@ -143,7 +152,9 @@ void app_main(void)
     gpio_set_direction(D0, GPIO_MODE_OUTPUT);
 
 	ble_gatt_server_init();
+	ble_gatt_server_register_callback(ble_gatt_server_callback);
 	connect_wifi_init();
+	connect_wifi();
 	http_server_start();
 
     xTaskCreatePinnedToCore(
@@ -165,12 +176,4 @@ void app_main(void)
         NULL,
 		1
     );
-
-	while (1) {
-		if (ble_gatt_server_ssid_password_set() && !connect_wifi_connected()) {
-			connect_wifi(ssid_value, password_value);
-		}
-
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
 }

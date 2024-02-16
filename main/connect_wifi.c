@@ -19,7 +19,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 		esp_wifi_connect();
 		wifi_connection_attempts++;
 	} else {
-		ESP_LOGI(TAG, "Failed to Connect to WIFI");
 		xSemaphoreGive(wifi_connect_done);
 	}
 }
@@ -47,7 +46,17 @@ void connect_wifi_init() {
 	esp_wifi_init(&init_config);
 }
 
-void connect_wifi(uint8_t *ssid, uint8_t *password) {
+void connect_wifi_config(uint8_t *ssid, uint8_t *password) {
+	wifi_config_t wifi_config = {};
+	strcpy((char *)wifi_config.sta.ssid, (char *)ssid);
+	strcpy((char *)wifi_config.sta.password, (char *)password);
+	ESP_LOGI(TAG, "SSID Set: %s, Password Set: %s", wifi_config.sta.ssid, wifi_config.sta.password);
+	esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+}
+
+void connect_wifi() {
+	if (wifi_connected) return;
+
 	esp_event_handler_instance_t wifi_event_handler_instance;
 	esp_event_handler_instance_register(
 		WIFI_EVENT,
@@ -65,12 +74,6 @@ void connect_wifi(uint8_t *ssid, uint8_t *password) {
 		&ip_event_handler_instance
 	);
 
-	wifi_config_t wifi_config = {};
-	strcpy((char *)wifi_config.sta.ssid, (char *)ssid);
-	strcpy((char *)wifi_config.sta.password, (char *)password);
-	ESP_LOGI(TAG, "SSID Set: %s, Password Set: %s", wifi_config.sta.ssid, wifi_config.sta.password);
-	esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-
 	esp_wifi_start();
 
 	ESP_LOGI(TAG, "Attempting to Connect to WIFI");
@@ -78,15 +81,22 @@ void connect_wifi(uint8_t *ssid, uint8_t *password) {
 
 	xSemaphoreTake(wifi_connect_done, 10000 / portTICK_PERIOD_MS);
 
+	if (!wifi_connected) {
+		ESP_LOGI(TAG, "Failed to Connect to WIFI");
+		esp_wifi_stop();
+	}
+
+	wifi_connection_attempts = 0;
+
 	esp_event_handler_instance_unregister(
 		WIFI_EVENT,
 		WIFI_EVENT_STA_DISCONNECTED,
-		wifi_event_handler
+		wifi_event_handler_instance
 	);
 	esp_event_handler_instance_unregister(
 		IP_EVENT,
 		IP_EVENT_STA_GOT_IP,
-		ip_event_handler
+		ip_event_handler_instance
 	);
 }
 

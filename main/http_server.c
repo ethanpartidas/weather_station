@@ -5,7 +5,7 @@ static const char *TAG = "HTTP_SERVER";
 
 static httpd_handle_t server = NULL;
 static uint8_t th_value[4] = {0};
-static char message_buffer[48] = {0};
+static char message_buffer[400] = {0};
 
 static esp_err_t get_handler(httpd_req_t *req) {
 	float humidity = th_value[0];
