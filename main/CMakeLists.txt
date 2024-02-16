@@ -7,3 +7,9 @@ idf_component_register(
 	INCLUDE_DIRS
 		"."
 )
+
+spiffs_create_partition_image(
+	filesystem
+	../filesystem
+	FLASH_IN_PROJECT
+)

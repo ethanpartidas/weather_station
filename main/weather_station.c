@@ -153,8 +153,11 @@ void app_main(void)
 
 	ble_gatt_server_init();
 	ble_gatt_server_register_callback(ble_gatt_server_callback);
+
 	connect_wifi_init();
 	connect_wifi();
+
+	http_server_init();
 	http_server_start();
 
     xTaskCreatePinnedToCore(
