@@ -1,2 +1,3 @@
 void connect_wifi_init();
-int connect_wifi();
+void connect_wifi();
+uint8_t connect_wifi_connected();

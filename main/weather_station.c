@@ -5,6 +5,10 @@
 #include "nvs_flash.h"
 
 #include "ble_gatt_server.h"
+extern uint8_t ssid_value[33];
+extern uint8_t password_value[64];
+#include "connect_wifi.h"
+#include "http_server.h"
 
 #define TAG "WEATHER_STATION"
 
@@ -20,10 +24,10 @@
 #define D1 27
 #define D0 32
 
-char LCD_message_buffer[64] = {0}; 
+static char LCD_message_buffer[64] = {0}; 
 static SemaphoreHandle_t LCD_message_buffer_update;
 
-void pollDHT11(void* parameter) {
+static void pollDHT11(void* parameter) {
 	uint32_t data = 0;
 	uint8_t th_value[4];
 	int64_t time_us_start;
@@ -60,6 +64,7 @@ void pollDHT11(void* parameter) {
 		th_value[3] = data & 0xFF;
 
 		ble_gatt_server_set_th_value(th_value);
+		http_server_set_th_value(th_value);
 
 		ble_gatt_server_notify();
 
@@ -67,7 +72,7 @@ void pollDHT11(void* parameter) {
     }
 }
 
-void send_command(int command) {
+static void send_command(int command) {
     gpio_set_level(RS, (command & 0x100) != 0);
     gpio_set_level(D7, (command & 0x080) != 0);
     gpio_set_level(D6, (command & 0x040) != 0);
@@ -83,18 +88,18 @@ void send_command(int command) {
     gpio_set_level(E, 0);
 }
 
-void send_letter(char letter) {
+static void send_letter(char letter) {
     send_command(0x100 + letter);
 }
 
-void send_string(char *buf) {
+static void send_string(char *buf) {
     for (int i = 0; buf[i] != '\0'; i++) {
         vTaskDelay(10 / portTICK_PERIOD_MS);
         send_letter(buf[i]);
     }
 }
 
-void outputLCD(void* parameter) {
+static void outputLCD(void* parameter) {
 	// two line mode
 	send_command(0x038);
 
@@ -138,6 +143,8 @@ void app_main(void)
     gpio_set_direction(D0, GPIO_MODE_OUTPUT);
 
 	ble_gatt_server_init();
+	connect_wifi_init();
+	http_server_start();
 
     xTaskCreatePinnedToCore(
         pollDHT11,
@@ -158,4 +165,12 @@ void app_main(void)
         NULL,
 		1
     );
+
+	while (1) {
+		if (ble_gatt_server_ssid_password_set() && !connect_wifi_connected()) {
+			connect_wifi(ssid_value, password_value);
+		}
+
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
 }

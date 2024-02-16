@@ -2,6 +2,7 @@ idf_component_register(
 	SRCS
 		"ble_gatt_server.c"          
 		"connect_wifi.c"
+		"http_server.c"
 		"weather_station.c"
 	INCLUDE_DIRS
 		"."

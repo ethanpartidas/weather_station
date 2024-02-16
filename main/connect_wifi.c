@@ -5,7 +5,7 @@
 
 #include <string.h>
 
-#define MAX_ATTEMPTS 10
+#define MAX_ATTEMPTS 3
 
 static const char *TAG = "CONNECT_WIFI";
 
@@ -45,7 +45,9 @@ void connect_wifi_init() {
 	// initialize wifi stack and start wifi task
 	wifi_init_config_t init_config = WIFI_INIT_CONFIG_DEFAULT();
 	esp_wifi_init(&init_config);
+}
 
+void connect_wifi(uint8_t *ssid, uint8_t *password) {
 	esp_event_handler_instance_t wifi_event_handler_instance;
 	esp_event_handler_instance_register(
 		WIFI_EVENT,
@@ -63,9 +65,6 @@ void connect_wifi_init() {
 		&ip_event_handler_instance
 	);
 
-}
-
-int connect_wifi(uint8_t *ssid, uint8_t *password) {
 	wifi_config_t wifi_config = {};
 	strcpy((char *)wifi_config.sta.ssid, (char *)ssid);
 	strcpy((char *)wifi_config.sta.password, (char *)password);
@@ -79,7 +78,6 @@ int connect_wifi(uint8_t *ssid, uint8_t *password) {
 
 	xSemaphoreTake(wifi_connect_done, 10000 / portTICK_PERIOD_MS);
 
-	/*
 	esp_event_handler_instance_unregister(
 		WIFI_EVENT,
 		WIFI_EVENT_STA_DISCONNECTED,
@@ -90,7 +88,8 @@ int connect_wifi(uint8_t *ssid, uint8_t *password) {
 		IP_EVENT_STA_GOT_IP,
 		ip_event_handler
 	);
-	*/
+}
 
+uint8_t connect_wifi_connected() {
 	return wifi_connected;
 }

@@ -8,8 +8,6 @@
 
 #include <string.h>
 
-#include "connect_wifi.h"
-
 #define TAG "BLE_GATT_SERVER"
 #define DEVICE_NAME "Weather Station"
 
@@ -63,8 +61,10 @@ static const uint8_t char_prop_read_notify              = ESP_GATT_CHAR_PROP_BIT
 static const uint8_t char_prop_read_write             	= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
 static uint8_t th_ccc[2]      			   				= {0};
 static uint8_t th_value[4]                 				= {0};
-static uint8_t ssid_value[33]							= {0};
-static uint8_t password_value[64]						= {0};
+uint8_t ssid_value[33]									= {0};
+uint8_t password_value[64]								= {0};
+uint8_t ssid_set = 0;
+uint8_t password_set = 0;
 
 enum {
 	SERV_IDX,
@@ -216,11 +216,12 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 				memset(ssid_value, 0, 32);
 				memcpy(ssid_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set SSID: %s", ssid_value);
+				ssid_set = 1;
 			} else if (param->write.handle == handles[PASS_VAL_IDX]) {
 				memset(password_value, 0, 63);
 				memcpy(password_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set Password: %s", password_value);
-				connect_wifi(ssid_value, password_value);
+				password_set = 1;
 			}
 			break;
 		case ESP_GATTS_CONNECT_EVT:
@@ -253,8 +254,6 @@ void ble_gatt_server_init() {
 	esp_ble_gatts_app_register(0);
 
 	esp_ble_gatt_set_local_mtu(500);
-
-	connect_wifi_init();
 }
 
 void ble_gatt_server_set_th_value(uint8_t *th_value_input) {
@@ -274,4 +273,8 @@ void ble_gatt_server_notify() {
 		);
 		ESP_LOGI(TAG, "Notifying Client of Update");
 	}
+}
+
+uint8_t ble_gatt_server_ssid_password_set() {
+	return ssid_set && password_set;
 }
