@@ -10,6 +10,8 @@ extern uint8_t password_value[64];
 #include "connect_wifi.h"
 #include "http_server.h"
 
+//#define DUMMY_POLL
+
 #define TAG "WEATHER_STATION"
 
 #define DHT11_PIN 16
@@ -28,8 +30,9 @@ static char LCD_message_buffer[64] = {0};
 static SemaphoreHandle_t LCD_message_buffer_update;
 
 static void pollDHT11(void* parameter) {
-	uint32_t data = 0;
+	uint32_t data = 0x32001400;
 	uint8_t th_value[4];
+#ifndef DUMMY_POLL
 	int64_t time_us_start;
 	int64_t time_us_stop;
     while(1) {
@@ -49,7 +52,10 @@ static void pollDHT11(void* parameter) {
             uint8_t bit = (time_us_stop - time_us_start > 50) ? 1 : 0;
             data = (data << 1) | bit;
         }
-
+#else
+	while (1) {
+		data += 1;
+#endif
         float humidity = data >> 24;
         float celsius = ((data << 16) >> 24) + (float)((data << 24) >> 24) / 10;
 		float fahrenheit = celsius * 1.8 + 32;

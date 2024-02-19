@@ -10,6 +10,10 @@ static char message_buffer[2048] = {0};
 
 static void implant_string(char *template, char *target, char *value) {
 	char *dest = strstr(template, target);
+	if (dest == NULL) {
+		ESP_LOGE(TAG, "Target string (%s) not found in template.", target);
+		return;
+	}
 	strncpy(dest, value, strlen(target));
 }
 
@@ -23,12 +27,12 @@ static esp_err_t get_handler(httpd_req_t *req) {
 	fclose(f);
 
 	char temp[6] = {0};
-	sprintf(temp, "%.0f", humidity);
+	sprintf(temp, "%02.0f", humidity);
 	implant_string(message_buffer, "hm", temp);
-	sprintf(temp, "%.1f", celsius);
-	implant_string(message_buffer, "cels", temp);
-	sprintf(temp, "%.2f", fahrenheit);
-	implant_string(message_buffer, "fahre", temp);
+	sprintf(temp, "%02.0f", celsius);
+	implant_string(message_buffer, "cs", temp);
+	sprintf(temp, "%02.0f", fahrenheit);
+	implant_string(message_buffer, "fh", temp);
 
 	httpd_resp_send(req, message_buffer, HTTPD_RESP_USE_STRLEN);
 	ESP_LOGI(TAG, "Received GET Request");

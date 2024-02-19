@@ -82,7 +82,7 @@ void connect_wifi() {
 	xSemaphoreTake(wifi_connect_done, 10000 / portTICK_PERIOD_MS);
 
 	if (!wifi_connected) {
-		ESP_LOGI(TAG, "Failed to Connect to WIFI");
+		ESP_LOGW(TAG, "Failed to Connect to WIFI");
 		esp_wifi_stop();
 	}
 
