@@ -44,6 +44,9 @@ void connect_wifi_init() {
 	// initialize wifi stack and start wifi task
 	wifi_init_config_t init_config = WIFI_INIT_CONFIG_DEFAULT();
 	esp_wifi_init(&init_config);
+
+	// set the wifi controller to be a station
+	esp_wifi_set_mode(WIFI_MODE_STA);
 }
 
 void connect_wifi_config(uint8_t *ssid, uint8_t *password) {

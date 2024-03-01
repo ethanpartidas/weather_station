@@ -10,21 +10,22 @@ extern uint8_t password_value[64];
 #include "connect_wifi.h"
 #include "http_server.h"
 
-//#define DUMMY_POLL
+#define DUMMY_POLL
 
 #define TAG "WEATHER_STATION"
 
-#define DHT11_PIN 16
-#define RS 17
-#define E 18
-#define D7 19
-#define D6 21
-#define D5 22
-#define D4 23
-#define D3 25
-#define D2 26
-#define D1 27
-#define D0 32
+#define DHT11_PIN 26
+#define RS 23
+#define RW 22
+#define E 21
+#define D7 27
+#define D6 13
+#define D5 15
+#define D4 4
+#define D3 16
+#define D2 17
+#define D1 18
+#define D0 19
 
 static char LCD_message_buffer[64] = {0}; 
 static SemaphoreHandle_t LCD_message_buffer_update;
@@ -88,10 +89,13 @@ static void send_command(int command) {
     gpio_set_level(D2, (command & 0x004) != 0);
     gpio_set_level(D1, (command & 0x002) != 0);
     gpio_set_level(D0, (command & 0x001) != 0);
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+	
+	int64_t time_us_start = esp_timer_get_time();
+
     gpio_set_level(E, 1);
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+	while (esp_timer_get_time() - time_us_start < 1000) {}
     gpio_set_level(E, 0);
+	while (esp_timer_get_time() - time_us_start < 2000) {}
 }
 
 static void send_letter(char letter) {
@@ -100,12 +104,14 @@ static void send_letter(char letter) {
 
 static void send_string(char *buf) {
     for (int i = 0; buf[i] != '\0'; i++) {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
         send_letter(buf[i]);
     }
 }
 
 static void outputLCD(void* parameter) {
+	// wait for pin 15 to settle
+	//vTaskDelay(1000/portTICK_PERIOD_MS);
+
 	// two line mode
 	send_command(0x038);
 
@@ -146,25 +152,20 @@ void app_main(void)
 	LCD_message_buffer_update = xSemaphoreCreateBinary();
 
     gpio_set_direction(DHT11_PIN, GPIO_MODE_INPUT);
-    gpio_set_direction(RS, GPIO_MODE_OUTPUT);
-    gpio_set_direction(E, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D7, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D6, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D5, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D4, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D3, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D2, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D1, GPIO_MODE_OUTPUT);
-    gpio_set_direction(D0, GPIO_MODE_OUTPUT);
 
-	ble_gatt_server_init();
-	ble_gatt_server_register_callback(ble_gatt_server_callback);
-
-	connect_wifi_init();
-	connect_wifi();
-
-	http_server_init();
-	http_server_start();
+	gpio_num_t output_pins[11] = {RS, RW, E, D0, D1, D2, D3, D4, D5, D6, D7};
+	uint64_t output_pin_bit_mask = 0;
+	for (int i = 0; i < 11; i++) {
+		output_pin_bit_mask |= (1 << output_pins[i]);
+	}
+	gpio_config_t gpio_conf = {
+		.pin_bit_mask = output_pin_bit_mask,
+		.mode = GPIO_MODE_OUTPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	gpio_config(&gpio_conf);
 
     xTaskCreatePinnedToCore(
         pollDHT11,
@@ -185,4 +186,13 @@ void app_main(void)
         NULL,
 		1
     );
+
+	ble_gatt_server_init();
+	ble_gatt_server_register_callback(ble_gatt_server_callback);
+
+	connect_wifi_init();
+	connect_wifi();
+
+	http_server_init();
+	http_server_start();
 }
