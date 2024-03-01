@@ -10,7 +10,7 @@ extern uint8_t password_value[64];
 #include "connect_wifi.h"
 #include "http_server.h"
 
-#define DUMMY_POLL
+//#define DUMMY_POLL
 
 #define TAG "WEATHER_STATION"
 
@@ -41,6 +41,7 @@ static void pollDHT11(void* parameter) {
         gpio_set_level(DHT11_PIN, 0);
     	time_us_start = esp_timer_get_time();
 		while (esp_timer_get_time() - time_us_start < 20000) {}
+        gpio_set_level(DHT11_PIN, 1);
         gpio_set_direction(DHT11_PIN, GPIO_MODE_INPUT);
         while(gpio_get_level(DHT11_PIN) == 1){}
         while(gpio_get_level(DHT11_PIN) == 0){}
@@ -109,14 +110,14 @@ static void send_string(char *buf) {
 }
 
 static void outputLCD(void* parameter) {
-	// wait for pin 15 to settle
-	//vTaskDelay(1000/portTICK_PERIOD_MS);
-
 	// two line mode
 	send_command(0x038);
 
     // remove cursor
     send_command(0x00C);
+
+	// clear display
+	send_command(0x001);
 
     while(1) {
 		vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -124,9 +125,6 @@ static void outputLCD(void* parameter) {
 		if (xSemaphoreTake(LCD_message_buffer_update, 1) == pdFALSE) {
 			continue;
 		}
-
-        // clear display
-        send_command(0x001);
 
         // return home
         send_command(0x002);
@@ -151,21 +149,37 @@ void app_main(void)
 
 	LCD_message_buffer_update = xSemaphoreCreateBinary();
 
-    gpio_set_direction(DHT11_PIN, GPIO_MODE_INPUT);
+	gpio_config_t input_gpio_conf = {
+		.pin_bit_mask = (1 << DHT11_PIN),
+		.mode = GPIO_MODE_INPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE
+	};
+	gpio_config(&input_gpio_conf);
 
 	gpio_num_t output_pins[11] = {RS, RW, E, D0, D1, D2, D3, D4, D5, D6, D7};
 	uint64_t output_pin_bit_mask = 0;
 	for (int i = 0; i < 11; i++) {
 		output_pin_bit_mask |= (1 << output_pins[i]);
 	}
-	gpio_config_t gpio_conf = {
+	gpio_config_t output_gpio_conf = {
 		.pin_bit_mask = output_pin_bit_mask,
 		.mode = GPIO_MODE_OUTPUT,
 		.pull_up_en = GPIO_PULLUP_DISABLE,
 		.pull_down_en = GPIO_PULLDOWN_DISABLE,
 		.intr_type = GPIO_INTR_DISABLE
 	};
-	gpio_config(&gpio_conf);
+	gpio_config(&output_gpio_conf);
+
+	ble_gatt_server_init();
+	ble_gatt_server_register_callback(ble_gatt_server_callback);
+
+	connect_wifi_init();
+	connect_wifi();
+
+	http_server_init();
+	http_server_start();
 
     xTaskCreatePinnedToCore(
         pollDHT11,
@@ -186,13 +200,4 @@ void app_main(void)
         NULL,
 		1
     );
-
-	ble_gatt_server_init();
-	ble_gatt_server_register_callback(ble_gatt_server_callback);
-
-	connect_wifi_init();
-	connect_wifi();
-
-	http_server_init();
-	http_server_start();
 }
