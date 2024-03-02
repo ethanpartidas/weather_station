@@ -10,8 +10,6 @@ extern uint8_t password_value[64];
 #include "connect_wifi.h"
 #include "http_server.h"
 
-//#define DUMMY_POLL
-
 #define TAG "WEATHER_STATION"
 
 #define DHT11_PIN 26
@@ -31,9 +29,8 @@ static char LCD_message_buffer[64] = {0};
 static SemaphoreHandle_t LCD_message_buffer_update;
 
 static void pollDHT11(void* parameter) {
-	uint32_t data = 0x32001400;
+	uint64_t data = 0x3200140000;
 	uint8_t th_value[4];
-#ifndef DUMMY_POLL
 	int64_t time_us_start;
 	int64_t time_us_stop;
     while(1) {
@@ -46,20 +43,44 @@ static void pollDHT11(void* parameter) {
         while(gpio_get_level(DHT11_PIN) == 1){}
         while(gpio_get_level(DHT11_PIN) == 0){}
         while(gpio_get_level(DHT11_PIN) == 1){}
-        for (int i = 0; i < 32; i++) {
-            while(gpio_get_level(DHT11_PIN) == 0){}
+		int timeout = 0;
+        for (int i = 0; i < 40; i++) {
+            while(gpio_get_level(DHT11_PIN) == 0) {}
             time_us_start = esp_timer_get_time();
-            while(gpio_get_level(DHT11_PIN) == 1){}
-            time_us_stop = esp_timer_get_time();
+            while(gpio_get_level(DHT11_PIN) == 1) {
+				time_us_stop = esp_timer_get_time();
+				if (time_us_stop - time_us_start > 100) {
+					timeout = 1;
+					break;
+				}
+			}
+			if (timeout) {
+				break;
+			}
             uint8_t bit = (time_us_stop - time_us_start > 50) ? 1 : 0;
             data = (data << 1) | bit;
         }
-#else
-	while (1) {
-		data += 1;
-#endif
-        float humidity = data >> 24;
-        float celsius = ((data << 16) >> 24) + (float)((data << 24) >> 24) / 10;
+		if (timeout) {
+			ESP_LOGW(TAG, "DHT11 Read Timed Out");
+			vTaskDelay(1000);
+			continue;
+		}
+
+		uint16_t checksum =
+			  ((data & 0xFF00000000) >> 32)
+			+ ((data & 0x00FF000000) >> 24)
+			+ ((data & 0x0000FF0000) >> 16)
+			+ ((data & 0x000000FF00) >> 8);
+		if ((checksum & 0xFF) != (data & 0xFF)) {
+			ESP_LOGW(TAG, "DHT11 Checksum Invalid");
+			vTaskDelay(1000);
+			continue;
+		}
+
+		data = (data >> 8) & 0xFFFFFFFF;
+
+        float humidity = (data & 0xFF000000) >> 24;
+        float celsius = ((data & 0x0000FF00) >> 8) + (float)(data & 0x000000FF) / 10;
 		float fahrenheit = celsius * 1.8 + 32;
 
 		ESP_LOGI(TAG, "Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F", humidity, celsius, fahrenheit);
