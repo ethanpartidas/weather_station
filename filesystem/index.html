@@ -9,7 +9,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            background-image: url('https://www.freevector.com/uploads/vector/preview/31564/freevectorBackgroundBlueSkyBackgrounday0222_generated.jpg'); /* Replace with your sky image URL */
+            background-image: url('https://www.freevector.com/uploads/vector/preview/31564/freevectorBackgroundBlueSkyBackgrounday0222_generated.jpg');
             background-size: cover;
             background-position: center;
             height: 100vh;
@@ -45,15 +45,35 @@
         .weather-info {
             font-size: 1.5em;
         }
+
+        .download-button {
+            background-color: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .download-button:hover {
+			background-color: rgba(35, 130, 200, 0.75);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Weather Station</h1>
-		<div class="temperature">fh<span>°F (cs°C)</span></div>
+        <div class="temperature">fh<span>°F (cs°C)</span></div>
         <div class="weather-info">
             <p>Humidity: hm%</p>
         </div>
+        <a href="log.csv" class="download-button" download>Download Log File</a>
     </div>
 </body>
 </html>
+

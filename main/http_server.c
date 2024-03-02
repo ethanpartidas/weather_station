@@ -1,3 +1,7 @@
+#include <time.h>
+#include <sys/time.h>
+#include <esp_sntp.h>
+
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
@@ -6,7 +10,8 @@ static const char *TAG = "HTTP_SERVER";
 
 static httpd_handle_t server = NULL;
 static uint8_t th_value[4] = {0};
-static char message_buffer[2048] = {0};
+static char message_buffer[4096] = {0};
+static char log_buffer[32768] = {0};
 
 static void implant_string(char *template, char *target, char *value) {
 	char *dest = strstr(template, target);
@@ -46,6 +51,30 @@ static httpd_uri_t uri_get = {
 	.user_ctx = NULL
 };
 
+static esp_err_t download_handler(httpd_req_t *req) {
+	FILE *f = fopen("/filesystem/log.csv", "r");
+	fread(log_buffer, 1, sizeof(log_buffer), f);
+	fclose(f);
+
+	httpd_resp_set_type(req, "text/csv");
+	httpd_resp_send(req, log_buffer, HTTPD_RESP_USE_STRLEN);
+	ESP_LOGI(TAG, "Received Download Request");
+	return ESP_OK;
+}
+
+static httpd_uri_t uri_download = {
+	.uri = "/log.csv",
+	.method = HTTP_GET,
+	.handler = download_handler,
+	.user_ctx = NULL
+};
+
+void initialize_sntp() {
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_init();
+}
+
 void http_server_init() {
 	esp_vfs_spiffs_conf_t config = {
 		.base_path = "/filesystem",
@@ -58,9 +87,14 @@ void http_server_init() {
 
 void http_server_start() {
 	if (server != NULL) return;
+
+	initialize_sntp();
+
 	httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 	httpd_start(&server, &config);
 	httpd_register_uri_handler(server, &uri_get);
+	httpd_register_uri_handler(server, &uri_download);
+
 	ESP_LOGI(TAG, "Started HTTP Server");
 }
 
@@ -72,4 +106,21 @@ void http_server_stop() {
 
 void http_server_set_th_value(uint8_t *th_value_input) {
 	memcpy(th_value, th_value_input, 4);
+
+	int humidity = th_value[0];
+	float celsius = th_value[2] + (float)th_value[3] / 10;
+
+	char time_str[64];
+	time_t now;
+	struct tm time_info;
+	time(&now);
+	localtime_r(&now, &time_info);
+	strftime(time_str, 64, "%Y-%m-%d %H:%M:%S", &time_info);
+	if (time_str[0] == '1') return;
+
+	sprintf(message_buffer, "%s,%.1f,%d\n", time_str, celsius, humidity);
+
+	FILE *f = fopen("/filesystem/log.csv", "a");
+	fwrite(message_buffer, 1, strlen(message_buffer), f);
+	fclose(f);
 }

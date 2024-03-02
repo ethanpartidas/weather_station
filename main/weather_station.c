@@ -63,7 +63,7 @@ static void pollDHT11(void* parameter) {
 		float fahrenheit = celsius * 1.8 + 32;
 
 		ESP_LOGI(TAG, "Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F", humidity, celsius, fahrenheit);
-        sprintf(LCD_message_buffer, " Temp: %.2f F                           Humidity: %.0f%%", fahrenheit, humidity);
+        sprintf(LCD_message_buffer, " Temp: %.2f F                           Humidity: %.0f%%  ", fahrenheit, humidity);
 		xSemaphoreGive(LCD_message_buffer_update);
 		
 		th_value[0] = data >> 24;
