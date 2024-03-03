@@ -12,6 +12,9 @@
 #define TAG "BLE_GATT_SERVER"
 #define DEVICE_NAME "Weather Station"
 
+#define SSID_MAX_LEN 32
+#define PASSWORD_MAX_LEN 64
+
 static ble_gatt_server_callback_t callback = NULL;
 
 static uint8_t adv_service_uuid128[32] = {
@@ -53,26 +56,26 @@ struct gatts_profile {
 static struct gatts_profile profile = {};
 
 static const uint16_t gatts_service_uuid = 0x00FF;
-static const uint16_t gatts_th_uuid = 0xFF01;
+static const uint16_t gatts_sd_uuid = 0xFF01;
 static const uint16_t gatts_ssid_uuid = 0xFF02;
 static const uint16_t gatts_password_uuid = 0xFF03;
 
-static const uint16_t primary_service_uuid              = ESP_GATT_UUID_PRI_SERVICE;
-static const uint16_t characteristic_declaration_uuid   = ESP_GATT_UUID_CHAR_DECLARE;
-static const uint16_t characteristic_client_config_uuid = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
-static const uint8_t char_prop_read_notify              = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static const uint8_t char_prop_write             	= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
-static uint8_t th_ccc[2]      			   				= {0};
-static uint8_t th_value[4]                 				= {0};
-uint8_t ssid_value[33]									= {0};
-uint8_t password_value[64]								= {0};
+static const uint16_t primary_service_uuid				= ESP_GATT_UUID_PRI_SERVICE;
+static const uint16_t characteristic_declaration_uuid	= ESP_GATT_UUID_CHAR_DECLARE;
+static const uint16_t characteristic_client_config_uuid	= ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
+static const uint8_t char_prop_read_notify				= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+static const uint8_t char_prop_write					= ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE;
+static uint8_t sd_ccc[2]								= {0};
+static struct sensor_data sd_value						= {0};
+uint8_t ssid_value[SSID_MAX_LEN+1]						= {0};
+uint8_t password_value[PASSWORD_MAX_LEN+1]				= {0};
 uint8_t ssid_set = 0;
 
 enum {
 	SERV_IDX,
-	TH_IDX,
-	TH_VAL_IDX,
-	TH_CCC_IDX,
+	SD_IDX,
+	SD_VAL_IDX,
+	SD_CCC_IDX,
 	SSID_IDX,
 	SSID_VAL_IDX,
 	PASS_IDX,
@@ -95,8 +98,8 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			(uint8_t *)&gatts_service_uuid
 		}
 	},
-	// TH Characteristic Declaration
-	[TH_IDX] = {
+	// SD Characteristic Declaration
+	[SD_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
@@ -107,28 +110,28 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			(uint8_t *)&char_prop_read_notify
 		}
 	},
-	// TH Characteristic Value
-	[TH_VAL_IDX] = {
+	// SD Characteristic Value
+	[SD_VAL_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
-			(uint8_t *)&gatts_th_uuid,
+			(uint8_t *)&gatts_sd_uuid,
 			ESP_GATT_PERM_READ,
-			sizeof(th_value),
-			sizeof(th_value),
-			(uint8_t *)&th_value
+			sizeof(sd_value),
+			sizeof(sd_value),
+			(uint8_t *)&sd_value
 		}
 	},
-	// TH Characteristic CCC
-	[TH_CCC_IDX] = {
+	// SD Characteristic CCC
+	[SD_CCC_IDX] = {
 		{ESP_GATT_AUTO_RSP},
 		{
 			ESP_UUID_LEN_16,
 			(uint8_t *)&characteristic_client_config_uuid,
 			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
 			sizeof(uint16_t),
-			sizeof(th_ccc),
-			(uint8_t *)&th_ccc
+			sizeof(sd_ccc),
+			(uint8_t *)&sd_ccc
 		}
 	},
 	// SSID Characteristic Declaration
@@ -150,7 +153,7 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			ESP_UUID_LEN_16,
 			(uint8_t *)&gatts_ssid_uuid,
 			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-			32,
+			SSID_MAX_LEN,
 			0,
 			(uint8_t *)&ssid_value
 		}
@@ -174,7 +177,7 @@ static const esp_gatts_attr_db_t gatts_db[] = {
 			ESP_UUID_LEN_16,
 			(uint8_t *)&gatts_password_uuid,
 			ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-			63,
+			PASSWORD_MAX_LEN,
 			0,
 			(uint8_t *)&password_value
 		}
@@ -209,18 +212,18 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 			ESP_LOGI(TAG, "GATT Server Attribute Table Created");
 			break;
 		case ESP_GATTS_WRITE_EVT:
-			if (param->write.handle == handles[TH_CCC_IDX]) {
-					esp_ble_gatts_set_attr_value(handles[TH_CCC_IDX], 2, param->write.value);
-					th_ccc[0] = param->write.value[0];
-					th_ccc[1] = param->write.value[1];
+			if (param->write.handle == handles[SD_CCC_IDX]) {
+					esp_ble_gatts_set_attr_value(handles[SD_CCC_IDX], 2, param->write.value);
+					sd_ccc[0] = param->write.value[0];
+					sd_ccc[1] = param->write.value[1];
 					ESP_LOGI(TAG, "Client Wrote to Configuration");
 			} else if (param->write.handle == handles[SSID_VAL_IDX]) {
-				memset(ssid_value, 0, 32);
+				memset(ssid_value, 0, SSID_MAX_LEN);
 				memcpy(ssid_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set SSID: %s", ssid_value);
 				ssid_set = 1;
 			} else if (param->write.handle == handles[PASS_VAL_IDX]) {
-				memset(password_value, 0, 63);
+				memset(password_value, 0, PASSWORD_MAX_LEN);
 				memcpy(password_value, param->write.value, param->write.len);
 				ESP_LOGI(TAG, "Client Set Password: %s", password_value);
 				if (ssid_set) {
@@ -260,19 +263,19 @@ void ble_gatt_server_init() {
 	esp_ble_gatt_set_local_mtu(500);
 }
 
-void ble_gatt_server_set_th_value(uint8_t *th_value_input) {
-	memcpy(th_value, th_value_input, 4);
-	esp_ble_gatts_set_attr_value(handles[TH_VAL_IDX], 4, th_value);
+void ble_gatt_server_set_sensor_data(struct sensor_data sd_value_input) {
+	sd_value = sd_value_input;
+	esp_ble_gatts_set_attr_value(handles[SD_VAL_IDX], sizeof(struct sensor_data), (uint8_t *)&sd_value);
 }
 
 void ble_gatt_server_notify() {
-	if (profile.connected && th_ccc[0] == 0x01) {
+	if (profile.connected && sd_ccc[0] == 0x01) {
 		esp_ble_gatts_send_indicate(
 			profile.gatts_if,
 			profile.conn_id,
-			handles[TH_VAL_IDX],
-			4,
-			th_value,
+			handles[SD_VAL_IDX],
+			sizeof(struct sensor_data),
+			(uint8_t *)&sd_value,
 			false
 		);
 		ESP_LOGI(TAG, "Notifying Client of Update");

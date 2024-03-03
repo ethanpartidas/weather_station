@@ -5,6 +5,8 @@
 
 #include <string.h>
 
+#include "connect_wifi.h"
+
 #define MAX_ATTEMPTS 3
 
 static const char *TAG = "CONNECT_WIFI";

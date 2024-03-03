@@ -4,9 +4,10 @@
 #include "freertos/FreeRTOS.h"
 #include "nvs_flash.h"
 
+#include "sensor_data.h"
 #include "ble_gatt_server.h"
-extern uint8_t ssid_value[33];
-extern uint8_t password_value[64];
+extern uint8_t ssid_value[SSID_MAX_LEN+1];
+extern uint8_t password_value[PASSWORD_MAX_LEN+1];
 #include "connect_wifi.h"
 #include "http_server.h"
 
@@ -29,8 +30,8 @@ static char LCD_message_buffer[64] = {0};
 static SemaphoreHandle_t LCD_message_buffer_update;
 
 static void pollDHT11(void* parameter) {
-	uint64_t data = 0x3200140000;
-	uint8_t th_value[4];
+	uint64_t data = 0;
+	struct sensor_data sd;
 	int64_t time_us_start;
 	int64_t time_us_stop;
     while(1) {
@@ -77,27 +78,23 @@ static void pollDHT11(void* parameter) {
 			continue;
 		}
 
-		data = (data >> 8) & 0xFFFFFFFF;
+		sd.humidity = (data & 0xFF00000000) >> 32;
+		sd.temperature = (data & 0x0000FFFF00) >> 8;
 
-        float humidity = (data & 0xFF000000) >> 24;
-        float celsius = ((data & 0x0000FF00) >> 8) + (float)(data & 0x000000FF) / 10;
-		float fahrenheit = celsius * 1.8 + 32;
+        float humidity = sensor_data_get_humidity(sd);
+        float celsius = sensor_data_get_celsius(sd);
+		float fahrenheit = sensor_data_get_fahrenheit(sd);
 
 		ESP_LOGI(TAG, "Humidity: %.0f%% | Temperature: %.1f°C ~ %.2f°F", humidity, celsius, fahrenheit);
         sprintf(LCD_message_buffer, " Temp: %.2f F                           Humidity: %.0f%%  ", fahrenheit, humidity);
 		xSemaphoreGive(LCD_message_buffer_update);
-		
-		th_value[0] = data >> 24;
-		th_value[1] = (data & 0xFF0000) >> 16;
-		th_value[2] = (data & 0xFF00) >> 8;
-		th_value[3] = data & 0xFF;
 
-		ble_gatt_server_set_th_value(th_value);
-		http_server_set_th_value(th_value);
+		ble_gatt_server_set_sensor_data(sd);
+		http_server_set_sensor_data(sd);
 
 		ble_gatt_server_notify();
 
-        vTaskDelay(2500 / portTICK_PERIOD_MS);
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
 }
 

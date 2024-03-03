@@ -6,10 +6,12 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 
+#include "http_server.h"
+
 static const char *TAG = "HTTP_SERVER";
 
 static httpd_handle_t server = NULL;
-static uint8_t th_value[4] = {0};
+static struct sensor_data sd;
 static char message_buffer[4096] = {0};
 static char log_buffer[32768] = {0};
 
@@ -23,9 +25,9 @@ static void implant_string(char *template, char *target, char *value) {
 }
 
 static esp_err_t get_handler(httpd_req_t *req) {
-	float humidity = th_value[0];
-	float celsius = th_value[2] + (float)th_value[3] / 10;
-	float fahrenheit = celsius * 1.8 + 32;
+	float humidity = sensor_data_get_humidity(sd);
+	float celsius = sensor_data_get_celsius(sd);
+	float fahrenheit = sensor_data_get_fahrenheit(sd);
 
 	FILE *f = fopen("/filesystem/index.html", "r");
 	fread(message_buffer, 1, sizeof(message_buffer), f);
@@ -104,11 +106,11 @@ void http_server_stop() {
 	ESP_LOGI(TAG, "Stopped HTTP Server");
 }
 
-void http_server_set_th_value(uint8_t *th_value_input) {
-	memcpy(th_value, th_value_input, 4);
+void http_server_set_sensor_data(struct sensor_data sd_input) {
+	sd = sd_input;
 
-	int humidity = th_value[0];
-	float celsius = th_value[2] + (float)th_value[3] / 10;
+	uint8_t humidity = sensor_data_get_humidity(sd);
+	float celsius = sensor_data_get_celsius(sd);
 
 	char time_str[64];
 	time_t now;
