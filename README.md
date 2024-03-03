@@ -3,9 +3,25 @@
 The goal of this project is to learn more about wireless communication protocols in embedded systems by programming an ESP32 to serve temperature and humidity data to both a mobile phone (through bluetooth) and a computer (through wifi). It involves building a custom PCB with a sensor, display, and ESP32 module, and then programming that module to communicate with the wired components on the board and other devices wirelessly as mentioned.
 ### Features
 - Built on a custom PCB.
+<p align="center">
+  <img src="pics/pcb.jpeg" height="300" alt="pcb">
+</p>
+
 - Serves weather data to a mobile phone via an app.
+<p align="center">
+  <img src="pics/app.jpeg" height="400" alt="pcb">
+</p>
+
 - Serves weather data to a computer via the browser.
+<p align="center">
+  <img src="pics/website.png" height="300" alt="pcb">
+</p>
+
 - Serves a downloadable file of data history.
+<p align="center">
+  <img src="pics/log.png" height="300" alt="pcb">
+</p>
+
 ## Hardware
 The hardware of the project consists of the ESP32 module, a DHT11 temperature and humidity sensor, a 1602 LCD display module, and an AMS1117-3.3 voltage regulator, along with the required peripheral components. The voltage regulator supplies the ESP32 module with the required 3.3V power, whereas the sensor and display run off the main 5V power. GPIOs are connected so that the ESP32 can communicate with the sensor and display.
 ## Firmware
