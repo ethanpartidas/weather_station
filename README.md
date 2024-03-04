@@ -9,17 +9,17 @@ The goal of this project is to learn more about wireless communication protocols
 
 - Serves weather data to a mobile phone via an app.
 <p align="center">
-  <img src="pics/app.jpeg" height="400" alt="pcb">
+  <img src="pics/app.jpeg" height="400" alt="app">
 </p>
 
 - Serves weather data to a computer via the browser.
 <p align="center">
-  <img src="pics/website.png" height="300" alt="pcb">
+  <img src="pics/website.png" height="300" alt="website">
 </p>
 
 - Serves a downloadable file of data history.
 <p align="center">
-  <img src="pics/log.png" height="300" alt="pcb">
+  <img src="pics/log.png" height="300" alt="log">
 </p>
 
 ## Hardware
