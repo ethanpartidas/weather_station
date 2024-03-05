@@ -42,7 +42,7 @@ The connect_wifi task simply allows us to attempt to connect to the local wifi n
 ### HTTP Server
 The http_server task hosts the http web server which provides an alternative way to read the live temperature and humidity data from the ESP32. The IP address given to the ESP32 can be entered into the url bar of a web browser, which will perform an HTTP GET request to the ESP32. The code will take a template html file from the nvs flash and fill in the appropriate temperature and humidity data into the template, and then send the result as an HTTP response.
 ## Software
-The mobile app is currently written in Kotlin for Android Studio. I am planning to transition to a cross-platform framework in the future.
+The mobile app is written using the Flutter framework, making it easy to deploy on both Android and iOS. It uses the FlutterBluePlus package to interact with the BLE GATT server on the ESP32. It features routines for connecting, reading temperature and humidity, subscribing to notifications, and uploading wifi credentials.
 ## References
 ### Datasheets
 - [DHT11](https://www.mouser.com/datasheet/2/758/DHT11-Technical-Data-Sheet-Translated-Version-1143054.pdf)
