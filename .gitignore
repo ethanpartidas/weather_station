@@ -3,3 +3,4 @@ sdkconfig
 build
 sdkconfig.old
 token.txt
+.DS_Store
