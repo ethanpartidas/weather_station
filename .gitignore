@@ -1,6 +1,4 @@
-CMakeLists.txt
-sdkconfig
 build
-sdkconfig.old
+*.old
 token.txt
 .DS_Store

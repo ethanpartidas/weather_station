@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'bluetooth.dart';
 void main() {
+  bluetoothInit();
   runApp(const MyApp());
 }
 
@@ -33,11 +35,43 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   bool connected = false;
+  double temperature = 0;
+  int humidity = 0;
+  String ssid = "";
+  String password = "";
 
-  void toggleConnected() {
+  void connect() async {
+    await bluetoothConnect();
     setState(() {
       connected = !connected;
     });
+    update(null);
+    bluetoothOnNotification(update);
+  }
+  
+  void disconnect() {
+    setState(() {
+      connected = !connected;
+    });
+    bluetoothDisconnect();
+  }
+
+  void update(List<int>? data) async {
+    data ??= await bluetoothRead();
+    if (data == null) {
+      return;
+    }
+    int newHumidity = data[0];
+    double newTemperature = (data[3].toDouble() + data[2].toDouble() / 10) * 1.8 + 32;
+    setState(() {
+      temperature = newTemperature;
+      humidity = newHumidity;
+    });
+  }
+
+  void setCredentials() async {
+    await bluetoothSetSSID(ssid);
+    await bluetoothSetPassword(password);
   }
 
   @override
@@ -51,25 +85,42 @@ class _MyHomePageState extends State<MyHomePage> {
             fit: BoxFit.cover,
           ),
           Container(
-            color: Colors.black.withOpacity(0.1), // Semi-transparent black color
+            color: Colors.black.withOpacity(0.1),
           ),
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 const SizedBox(height: 60),
-                const MyText(text: 'Temperature: 76°F'),
-                const MyText(text: 'Humidity: 52%'),
+                MyText(text: 'Temperature: ${temperature.toStringAsFixed(2)}°F'),
+                MyText(text: 'Humidity: $humidity%'),
                 const SizedBox(height: 40),
-                const MyTextField(hint: "SSID"),
-                const MyTextField(hint: "Password"),
+                MyTextField(
+                  hint: "SSID",
+                  onChanged: (value) {
+                    ssid = value;
+                  },  
+                ),
+                MyTextField(
+                  hint: "Password",
+                  onChanged: (value) {
+                    password = value;
+                  },
+                ),
                 const SizedBox(height: 60),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    MyButton(text: connected ? "Disconnect" : "Connect", onPressed: toggleConnected,),
+                  children: <Widget>[
+                    MyButton(
+                      text: connected ? "Disconnect" : "Connect",
+                      onPressed: connected ? disconnect : connect,
+                    ),
                     const SizedBox(width: 10),
-                    MyButton(text: "Upload", onPressed: () {}, enabled: connected,),
+                    MyButton(
+                      text: "Upload",
+                      onPressed: setCredentials,
+                      enabled: connected,
+                    ),
                   ],
                 ),
               ],
@@ -118,8 +169,8 @@ class MyText extends StatelessWidget {
         fontWeight: FontWeight.bold,
         shadows: [
           Shadow(
-            color: borderColor, // Set the color of the border
-            blurRadius: 5, // blur radius of the border
+            color: borderColor,
+            blurRadius: 5,
           ),
         ],
       ),
@@ -131,9 +182,11 @@ class MyTextField extends StatelessWidget {
   const MyTextField({
     super.key,
     required this.hint,
+    this.onChanged,
   });
 
   final String hint;
+  final Function(String)? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +200,17 @@ class MyTextField extends StatelessWidget {
         borderRadius: BorderRadius.circular(5),
       ),
       child: TextField(
-        decoration: InputDecoration(hintText: hint),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            fontSize: 12,
+          ),
+        ),
+        onChanged: onChanged,
+        style: const TextStyle(
+          color: Color(0xdfffffff),
+          fontSize: 18,
+        ),
       ),
     );
   }

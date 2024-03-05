@@ -2,6 +2,9 @@
 
 #include "sensor_data.h"
 
+#define SSID_MAX_LEN 32
+#define PASSWORD_MAX_LEN 64
+
 typedef enum {
 	BLE_GATT_SERVER_SSID_PASSWORD_SET_EVENT
 } ble_gatt_server_event_t;

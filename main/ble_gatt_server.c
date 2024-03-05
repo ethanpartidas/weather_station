@@ -12,9 +12,6 @@
 #define TAG "BLE_GATT_SERVER"
 #define DEVICE_NAME "Weather Station"
 
-#define SSID_MAX_LEN 32
-#define PASSWORD_MAX_LEN 64
-
 static ble_gatt_server_callback_t callback = NULL;
 
 static uint8_t adv_service_uuid128[32] = {
@@ -211,11 +208,13 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 			esp_ble_gatts_start_service(handles[SERV_IDX]);
 			ESP_LOGI(TAG, "GATT Server Attribute Table Created");
 			break;
+		case ESP_GATTS_READ_EVT:
+			ESP_LOGI(TAG, "Client Read Characteristic");
+			break;
 		case ESP_GATTS_WRITE_EVT:
 			if (param->write.handle == handles[SD_CCC_IDX]) {
 					esp_ble_gatts_set_attr_value(handles[SD_CCC_IDX], 2, param->write.value);
-					sd_ccc[0] = param->write.value[0];
-					sd_ccc[1] = param->write.value[1];
+					memcpy(sd_ccc, param->write.value, 2);
 					ESP_LOGI(TAG, "Client Wrote to Configuration");
 			} else if (param->write.handle == handles[SSID_VAL_IDX]) {
 				memset(ssid_value, 0, SSID_MAX_LEN);
@@ -237,6 +236,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 			ESP_LOGI(TAG, "Client Connected");
 			break;
 		case ESP_GATTS_DISCONNECT_EVT:
+			memset(sd_ccc, 0, 2);
 			profile.connected = 0;
 			esp_ble_gap_start_advertising(&adv_params);
 			ESP_LOGI(TAG, "Client Disconnected");
