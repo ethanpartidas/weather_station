@@ -6,7 +6,7 @@
 #define PASSWORD_MAX_LEN 64
 
 typedef enum {
-	BLE_GATT_SERVER_SSID_PASSWORD_SET_EVENT
+    BLE_GATT_SERVER_SSID_PASSWORD_SET_EVENT
 } ble_gatt_server_event_t;
 
 typedef void (*ble_gatt_server_callback_t)(ble_gatt_server_event_t);
